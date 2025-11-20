@@ -1,0 +1,85 @@
+/* App Layout Structure */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-main-content {
+  flex: 1 0 auto;
+  position: relative;
+  z-index: 1;
+  /* IMPORTANT: Top padding to account for fixed navbar */
+  padding-top: 140px;
+  /* 80px navbar + 40px spacing */
+  padding-bottom: 40px;
+  /* Bottom spacing before footer */
+}
+
+/* Home page has no top padding because hero is full height */
+.app-main-content.home-main-content {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Content container for non-home pages */
+.app-content-container {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: 0 20px;
+  /* Only horizontal padding */
+  min-height: calc(100vh - 100px - 200px);
+  /* Viewport - top padding - footer */
+}
+
+/* Page Titles */
+.page-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+}
+
+.page-subtitle {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.section-subtitle {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 32px 0 20px;
+  color: var(--text-primary);
+}
+
+.section-spacing {
+  margin-bottom: 24px;
+}
+
+.flex-group {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-main-content {
+    padding-top: 110px;
+    /* 70px navbar + 20px spacing */
+  }
+
+  .app-content-container {
+    padding: 0 20px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .page-subtitle {
+    font-size: 16px;
+  }
+}

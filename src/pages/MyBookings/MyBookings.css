@@ -1,0 +1,84 @@
+
+.bookings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* More responsive grid */
+  gap: 20px; /* Reduced gap */
+}
+
+.booking-card {
+  /* Uses global .card styles */
+  display: flex; /* Changed to flex for simpler layout */
+  flex-direction: column;
+  gap: 15px; /* Reduced gap */
+}
+
+.booking-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px; /* Reduced padding */
+  border-bottom: 1px solid var(--border-color);
+}
+
+.booking-service-name {
+  font-size: 18px; /* Reduced font size */
+  font-weight: 600;
+}
+
+.booking-status {
+  padding: 4px 8px; /* Reduced padding */
+  border-radius: var(--border-radius-small);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-pending { background-color: #FFFBEB; color: #D97706; } /* Adjusted color */
+.status-confirmed { background-color: #ECFDF5; color: #059669; } /* Adjusted color */
+.status-completed { background-color: #EFF6FF; color: #2563EB; } /* Adjusted color */
+.status-cancelled { background-color: #FEF2F2; color: #DC2626; } /* Adjusted color */
+
+.booking-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Reduced gap */
+  font-size: 14px; /* Reduced font size */
+}
+
+.booking-detail-icon {
+  color: var(--text-color-soft);
+}
+
+.booking-detail-info strong {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.booking-detail-info span {
+  color: var(--text-color-soft);
+}
+
+.empty-bookings {
+  text-align: center;
+  padding: 60px 20px; /* Reduced padding */
+  background-color: #F9F9F9;
+  border-radius: var(--border-radius);
+  border: 1px dashed var(--border-color);
+}
+
+.empty-bookings-icon {
+  color: var(--primary-color);
+  margin-bottom: 15px; /* Reduced margin */
+}
+
+.empty-bookings h2 {
+  font-size: 20px; /* Reduced font size */
+  font-weight: 600;
+  margin-bottom: 8px; /* Reduced margin */
+}
+
+.empty-bookings p {
+  color: var(--text-color-soft);
+  margin-bottom: 20px; /* Reduced margin */
+  font-size: 14px;
+}

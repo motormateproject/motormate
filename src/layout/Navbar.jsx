@@ -5,7 +5,7 @@ import './Navbar.css';
 import { Menu, X } from 'feather-icons-react';
 
 const Navbar = () => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -42,7 +42,10 @@ const Navbar = () => {
           )}
         </nav>
         <div className="authLinks">
-          {user ? (
+          {loading ? (
+            // Placeholder or spinner for auth section
+            <div style={{ width: '100px', height: '40px' }}></div>
+          ) : user ? (
             <>
               <NavLink to="/profile" className="navLink">Profile</NavLink>
               <button onClick={signOut} className="btn btn-secondary">Logout</button>
@@ -75,7 +78,9 @@ const Navbar = () => {
           )}
 
           <div className="authLinks">
-            {user ? (
+            {loading ? (
+              <div style={{ width: '100%', height: '40px' }}></div>
+            ) : user ? (
               <>
                 <NavLink to="/profile" className="navLink" onClick={toggleMobileMenu}>Profile</NavLink>
                 <button onClick={() => { signOut(); toggleMobileMenu(); }} className="loginButton">Logout</button>

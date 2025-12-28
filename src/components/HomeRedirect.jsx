@@ -5,22 +5,35 @@ import HomePage from '../pages/Home';
 
 const HomeRedirect = () => {
     const { user, profile, loading } = useAuth();
-    const [showFallback, setShowFallback] = useState(false);
 
-    // Timeout fallback
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (loading || (user && !profile)) {
-                // Determine if we should really show fallback or just logout?
-                console.warn('Profile loading slow');
-                setShowFallback(true);
-            }
-        }, 8000);
+    // Check cached role immediately to prevent flash of wrong content
+    const cachedRole = localStorage.getItem('motormate_role');
 
-        return () => clearTimeout(timeoutId);
-    }, [loading, user, profile]);
+    // AUTHENTICATED USER HANDLING
+    if (user) {
+        // 1. Trust Profile First
+        if (profile?.role === 'garage_owner') {
+            return <Navigate to="/admin/dashboard" replace />;
+        }
 
-    if (loading) {
+        // 2. Trust Cache if Profile is loading/missing (FAST PATH)
+        if (!profile && cachedRole === 'garage_owner') {
+            return <Navigate to="/admin/dashboard" replace />;
+        }
+
+        // 3. If we have a user but no profile and no cache yet, WAIT.
+        if (!profile && loading) {
+            return (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                    <div className="spinner"></div>
+                </div>
+            );
+        }
+
+        // 4. Default: Render HomePage (Customer)
+        // If profile is loaded and role is NOT garage_owner, we fall through here.
+    } else if (loading) {
+        // No user detected yet, but loading...
         return (
             <div style={{
                 display: 'flex',
@@ -33,27 +46,6 @@ const HomeRedirect = () => {
                 Loading MotorMate...
             </div>
         );
-    }
-
-    // AUTHENTICATED USER HANDLING
-    if (user) {
-        // If we have a user but no profile yet, WAIT. Do not show HomePage.
-        if (!profile) {
-            return (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                    <div className="spinner"></div> {/* Or text "Verifying account..." */}
-                </div>
-            );
-        }
-
-        // We have user and profile
-        if (profile.role === 'garage_owner') {
-            return <Navigate to="/admin/dashboard" replace />;
-        }
-
-        // If customer, show homepage (which is below).
-        // BUT current structure returns HomePage at the end.
-        // We can just fall through.
     }
 
     // Standard Homepage for Visitors and Customers

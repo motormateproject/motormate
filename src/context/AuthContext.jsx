@@ -43,26 +43,34 @@ export const AuthProvider = ({ children }) => {
         userProfile.is_garage_owner = true;
       }
 
+      const role = (userProfile?.is_garage_owner || userMetadata?.is_garage_owner) ? 'garage_owner' : 'customer';
+
+      // CACHE THE ROLE
+      localStorage.setItem('motormate_role', role);
+
       const finalProfile = {
         id: userId,
         full_name: userProfile?.full_name || userMetadata?.full_name || '',
         email: userEmail,
         phone: userProfile?.phone || userMetadata?.phone || '',
-        role: (userProfile?.is_garage_owner || userMetadata?.is_garage_owner) ? 'garage_owner' : 'customer',
+        role: role,
         is_garage_owner: userProfile?.is_garage_owner ?? false
       };
 
       return finalProfile;
     } catch (profileError) {
       console.error('[AuthContext] Error fetching profile:', profileError.message);
-      // Fallback to basic profile
+
+      // Try to recover role from localStorage if fetch fails
+      const cachedRole = localStorage.getItem('motormate_role') || 'customer';
+
       return {
         id: userId,
         email: userEmail,
         full_name: userMetadata?.full_name || '',
         phone: userMetadata?.phone || '',
-        role: 'customer',
-        is_garage_owner: false
+        role: cachedRole,
+        is_garage_owner: cachedRole === 'garage_owner'
       };
     }
   };
@@ -112,6 +120,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(null);
           setProfile(null);
+          localStorage.removeItem('motormate_role'); // Clear cache on logout
         }
         setLoading(false);
       }
@@ -135,6 +144,9 @@ export const AuthProvider = ({ children }) => {
       if (authData.user) {
         const { full_name, phone, is_garage_owner } = data.options.data;
         const role = is_garage_owner ? 'garage_owner' : 'customer';
+
+        // Cache role immediately on signup
+        localStorage.setItem('motormate_role', role);
 
         setProfile({
           id: authData.user.id,

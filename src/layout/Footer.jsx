@@ -1,9 +1,34 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Footer.css';
 import { Facebook, Twitter, Instagram, Linkedin } from 'feather-icons-react';
 
 const Footer = () => {
+  const { profile } = useAuth();
+
+  // If garage owner, hide the customer-facing quick links
+  if (profile?.role === 'garage_owner') {
+    return (
+      <footer className="footer">
+        <div className="footer-content" style={{ justifyContent: 'center', textAlign: 'center' }}>
+          <div className="footer-about">
+            <h3 className="footer-logo">Motor<span>Mate</span> (Garage Partner)</h3>
+            <p>Partner Dashboard</p>
+          </div>
+          {/* Garage owners might not need social links or contact info repeated here if it's their internal dashboard */}
+          <div className="footer-contact">
+            <h4>Support</h4>
+            <p>admin@motormate.com (Support for Partners)</p>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>© {new Date().getFullYear()} All rights reserved</p>
+        </div>
+      </footer>
+    );
+  }
+
   return (
     <footer className="footer">
       <div className="footer-content">

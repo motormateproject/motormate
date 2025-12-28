@@ -24,7 +24,7 @@ const Navbar = () => {
   return (
     <header className={`header ${scrolled ? 'scrolled' : ''}`}>
       <div className="header-content">
-        <Link to="/" className="logo">Motor<span>Mate</span></Link>
+        <Link to={profile?.role === 'garage_owner' ? "/admin/dashboard" : "/"} className="logo">Motor<span>Mate</span></Link>
 
         {/* Desktop Navigation */}
         <nav className="nav">
@@ -47,7 +47,12 @@ const Navbar = () => {
             <div style={{ width: '100px', height: '40px' }}></div>
           ) : user ? (
             <>
-              <NavLink to="/profile" className="navLink">Profile</NavLink>
+              {profile?.role !== 'garage_owner' && (
+                <NavLink to="/profile" className="navLink">Profile</NavLink>
+              )}
+              {profile?.role === 'garage_owner' && (
+                <NavLink to="/admin/profile" className="navLink">Garage Profile</NavLink>
+              )}
               <button onClick={signOut} className="btn btn-secondary">Logout</button>
             </>
           ) : (
@@ -82,7 +87,12 @@ const Navbar = () => {
               <div style={{ width: '100%', height: '40px' }}></div>
             ) : user ? (
               <>
-                <NavLink to="/profile" className="navLink" onClick={toggleMobileMenu}>Profile</NavLink>
+                {profile?.role !== 'garage_owner' && (
+                  <NavLink to="/profile" className="navLink" onClick={toggleMobileMenu}>Profile</NavLink>
+                )}
+                {profile?.role === 'garage_owner' && (
+                  <NavLink to="/admin/profile" className="navLink" onClick={toggleMobileMenu}>Garage Profile</NavLink>
+                )}
                 <button onClick={() => { signOut(); toggleMobileMenu(); }} className="loginButton">Logout</button>
               </>
             ) : (

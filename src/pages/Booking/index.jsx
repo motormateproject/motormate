@@ -119,7 +119,12 @@ const BookingPage = () => {
       try {
         const services = await fetchGarageServices(garage.id);
         setAvailableServices(services);
-        // Keep the originally selected service selected
+
+        // Filter selected services: Only keep those that are available in the new garage
+        setSelectedServiceIds(prevIds => {
+          const newServiceIds = services.map(s => s.id);
+          return prevIds.filter(id => newServiceIds.includes(id));
+        });
       } catch (e) { console.error(e); }
       setLoading(false);
     }
@@ -239,8 +244,8 @@ const BookingPage = () => {
 
         <form onSubmit={handleConfirmBooking}>
 
-          {/* Garage Selection (if not already selected) */}
-          {!bookingInfo.garageId && availableGarages.length > 0 && (
+          {/* Garage Selection (if multiple available) */}
+          {availableGarages.length > 0 && (
             <div className="form-group">
               <label className="form-label" htmlFor="garage-select">Select Garage:</label>
               <select

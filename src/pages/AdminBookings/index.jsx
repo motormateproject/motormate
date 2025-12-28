@@ -98,7 +98,9 @@ const AdminBookingsPage = () => {
                 <tr key={booking.id}>
                   <td className="bookings-td" data-label="Customer">
                     <div className="customer-info">
-                      <span className="customer-name">{booking.users?.full_name || 'N/A'}</span>
+                      <Link to={`/admin/customer/${booking.user_id}`} className="customer-name-link" style={{ fontWeight: 'bold', color: 'var(--primary-color)', textDecoration: 'none' }}>
+                        {booking.users?.full_name || 'N/A'}
+                      </Link>
                       <span className="customer-email-mobile">{booking.users?.email}</span>
                     </div>
                   </td>

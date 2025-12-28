@@ -25,6 +25,7 @@ const ContactPage = lazy(() => import('./pages/Contact'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboard'));
 const AdminBookingsPage = lazy(() => import('./pages/AdminBookings'));
 const AdminProfilePage = lazy(() => import('./pages/AdminProfile'));
+const AdminCustomerDetailsPage = lazy(() => import('./pages/AdminCustomerDetails'));
 const SearchPage = lazy(() => import('./pages/Search'));
 
 // Loading component
@@ -75,6 +76,7 @@ function App() {
                 <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
                 <Route path="/admin/bookings" element={<AdminBookingsPage />} />
                 <Route path="/admin/profile" element={<AdminProfilePage />} />
+                <Route path="/admin/customer/:userId" element={<AdminCustomerDetailsPage />} />
               </Route>
             </Routes>
           </Suspense>

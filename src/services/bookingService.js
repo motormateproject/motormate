@@ -97,38 +97,6 @@ export const createBooking = async (bookingDetails) => {
 
 // Fetches all bookings for a specific user
 export const fetchUserBookings = async (userId) => {
-    // 1. Check cache
-    const cacheKey = `bookings_cache_${userId}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    let returnData = null;
-
-    if (cachedData) {
-        try {
-            const parsed = JSON.parse(cachedData);
-            // Valid for 5 minutes
-            if (Date.now() - parsed.timestamp < 1000 * 60 * 5) {
-                returnData = parsed.data;
-            }
-        } catch (e) { console.error('Cache parse error', e); }
-    }
-
-    // 2. Fetch fresh data (network-first strategy for critical data, but fall back to cache if fast response needed? 
-    // Actually, for "instant load" feeling, we want Stale-While-Revalidate pattern manually.
-    // However, as a simple async function, we can't emit twice. 
-    // So we'll fetch, and if it fails (not timeout), throw. 
-    // But to solve the USER's "loading time" complaint, we should return cache IF valid.
-    // BUT bookings change status. 5 mins cache might be okay.
-
-    // Let's go with: Return cached immediately if valid. Caller will see old data for 5 mins.
-    // Ideally we'd use React Query.
-
-    if (returnData) {
-        // We can optionally trigger a background refresh if we had a swr mechanism. 
-        // For now, let's just use the cache.
-        // To be safer, let's just lower cache time to 2 minutes.
-        return returnData;
-    }
-
     const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -141,13 +109,6 @@ export const fetchUserBookings = async (userId) => {
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    // Update cache
-    localStorage.setItem(cacheKey, JSON.stringify({
-        timestamp: Date.now(),
-        data: data
-    }));
-
     return data;
 };
 

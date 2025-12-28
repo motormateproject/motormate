@@ -14,7 +14,7 @@ const HomeRedirect = () => {
                 console.warn('Profile loading timed out, showing home page');
                 setShowFallback(true);
             }
-        }, 5000); // 5 second timeout
+        }, 10000); // 10 second timeout
 
         return () => clearTimeout(timeoutId);
     }, [loading, user, profile]);

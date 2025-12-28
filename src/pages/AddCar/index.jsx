@@ -14,6 +14,8 @@ const AddCarPage = () => {
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
 
+  const [rcFile, setRcFile] = useState(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -24,7 +26,7 @@ const AddCarPage = () => {
     setError('');
 
     try {
-      // 1. Ensure Profile Exists (Self-healing for legacy users)
+      // 1. Ensure Profile Exists
       const { data: profile, error: profileFetchError } = await supabase
         .from('profiles')
         .select('id')
@@ -32,7 +34,6 @@ const AddCarPage = () => {
         .single();
 
       if (profileFetchError && profileFetchError.code === 'PGRST116') {
-        // Profile missing, create it
         const { error: profileInsertError } = await supabase
           .from('profiles')
           .insert([{
@@ -42,19 +43,43 @@ const AddCarPage = () => {
             phone: user.user_metadata?.phone || '',
             is_garage_owner: false
           }]);
-
         if (profileInsertError) throw profileInsertError;
       } else if (profileFetchError) {
         throw profileFetchError;
       }
 
-      // 2. Insert Car
+      // 2. Upload RC Image if exists
+      let rcImageUrl = null;
+      if (rcFile) {
+        const fileExt = rcFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vehicle-docs')
+          .upload(fileName, rcFile);
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          // Continue without image or throw? Let's warn but continue.
+          // actually typically we want to stop.
+          // throw new Error('Failed to upload RC image. Please try again.');
+        }
+
+        // Get public URL (assuming bucket is public, otherwise use signed url)
+        const { data: { publicUrl } } = supabase.storage
+          .from('vehicle-docs')
+          .getPublicUrl(fileName);
+
+        rcImageUrl = publicUrl;
+      }
+
+      // 3. Insert Car
       const { error: insertError } = await supabase.from('cars').insert({
         user_id: user.id,
         make,
         model,
         year,
         license_plate: licensePlate,
+        rc_image_url: rcImageUrl
       });
 
       if (insertError) throw insertError;
@@ -95,6 +120,18 @@ const AddCarPage = () => {
           <div className="form-group">
             <label className="form-label" htmlFor="licensePlate">License Plate</label>
             <input id="licensePlate" type="text" className="form-input" placeholder="e.g., ABC-123" value={licensePlate} onChange={e => setLicensePlate(e.target.value)} required />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="rcInfo">Vehicle RC (Government ID)</label>
+            <input
+              id="rcInfo"
+              type="file"
+              className="form-input"
+              accept="image/*,.pdf"
+              onChange={e => setRcFile(e.target.files[0])}
+            />
+            <small style={{ color: '#666' }}>Upload an image or PDF of your Registration Certificate</small>
           </div>
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>

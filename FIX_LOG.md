@@ -1,20 +1,48 @@
-# MotorMate Fix Log
+# MotorMate Fix Log - Update 2
 
-## Backend & Logic Fixes
-I have refactored the core logic of the application to ensure stability, especially for the Vercel deployment.
+## New Features & Logic Enhancements
 
-1.  **Auth Context (`src/context/AuthContext.jsx`)**
-    *   **Fixed**: Removed manual caching of user sessions and profiles which was causing "Session loading timed out" errors.
-    *   **Improved**: Implemented a "failsafe" 4-second timeout. Even if the database connection causes a delay, the loading screen will now forcibly clear after 4 seconds, allowing the app to render.
-    *   **Improved**: Added a timeout specifically for the profile fetch so that one slow query doesn't freeze the entire user session.
+I have implemented the requested features to improve the user experience and functionality.
 
-2.  **Booking Service (`src/services/bookingService.js`)**
-    *   **Fixed**: Removed manual `localStorage` caching from `fetchUserBookings`. This ensures that when you or an admin updates a booking status, the changes appear immediately.
+1.  **Multiple Services Booking (`src/pages/Booking/index.jsx`)**
+    *   **Changed**: Replaced the single dropdown selection with a visual grid of selectable service cards.
+    *   **Logic**: Users can now toggle multiple services. The "Total Price" updates dynamically.
+    *   **Backend**: On confirmation, the system loops through all selected services and creates individual booking records for each, ensuring accurate tracking and pricing.
 
-3.  **Supabase Client (`src/lib/supabaseClient.js`)**
-    *   **Added**: Critical environment variable checks. If your Vercel project is missing `REACT_APP_SUPABASE_URL`, the console will now show a clear error.
+2.  **Past Date/Time Protection (`src/pages/Booking/index.jsx`)**
+    *   **Logic**: Added strict validation in `handleConfirmBooking`. It now checks if the selected date AND time are in the past relative to the current moment (with a 1-minute buffer) and blocks the booking with an error message.
 
-## Vercel Deployment Note
-Since you are hosted on Vercel:
-1.  Ensure your **Environment Variables** are set in the Vercel Dashboard.
-2.  Push these changes to GitHub to trigger a redeployment.
+3.  **Booking Cancellation & Dashboard Sync**
+    *   ** Verified**: The `updateBookingStatus` logic in `bookingService.js` correctly updates the database.
+    *   ** Verified**: `MyBookings` page correctly handles cancellation and UI updates.
+    *   ** Note**: Since both the User Dashboard and Garage Dashboard (Admin) fetch fresh data from the same database, status changes (like 'cancelled') are automatically reflected on both sides without extra code.
+
+4.  **Refined "My Bookings" Page (`src/pages/MyBookings/MyBookings.css`)**
+    *   **Styled**: Improved the card layout with better shadows, rounded corners, and cleaner typography.
+    *   **Badges**: Added distinct color-coded badges for 'Pending', 'Confirmed', 'Completed', and 'Cancelled' statuses.
+    *   **Layout**: Switched to a responsive grid that looks great on both mobile and desktop.
+
+5.  **RC Upload for Cars (`src/pages/AddCar/index.jsx` & database)**
+    *   **UI**: Added a file input field to the "Add Car" form for uploading the Registration Certificate (RC).
+    *   **Logic**: Implemented file upload to Supabase Storage bucket `vehicle-docs`.
+    *   **Database**: Created a migration script `update_cars_rc.sql` to add the `rc_image_url` column to the `cars` table.
+
+## Deployment Instructions
+
+### Database Update (Required)
+You must run the SQL in `update_cars_rc.sql` in your Supabase SQL Editor to add the support for RC images:
+1.  Go to Supabase Dashboard -> SQL Editor.
+2.  Paste content from `update_cars_rc.sql` (in your project root).
+3.  Run it.
+
+### Storage Bucket Setup
+Ensure you have a public storage bucket named `vehicle-docs` in Supabase:
+1.  Go to Storage.
+2.  Create a new bucket named `vehicle-docs`.
+3.  Set it to Public.
+
+### Code Push
+Push these changes to GitHub to redeploy on Vercel:
+`git add .`
+`git commit -m "Add multiple services, past date validation, RC upload, and refined UI"`
+`git push`

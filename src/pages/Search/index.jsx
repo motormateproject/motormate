@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchGarages } from '../../services/bookingService';
 import { getCurrentLocation, sortGaragesByDistance } from '../../lib/geolocation';
@@ -6,6 +7,7 @@ import { MapPin } from 'feather-icons-react';
 import './Search.css';
 
 const SearchPage = () => {
+  const { user, profile } = useAuth(); // Access profile from context
   const [garages, setGarages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -18,6 +20,15 @@ const SearchPage = () => {
   const [rating, setRating] = useState(0);
   const [serviceCategory, setServiceCategory] = useState(''); // Not yet implemented for filtering
   const [sortByDistance, setSortByDistance] = useState(false);
+
+  // Auto-set location from profile if available
+  useEffect(() => {
+    if (profile && profile.latitude && profile.longitude && !userLocation) {
+      console.log("Using profile location for sorting", profile.latitude, profile.longitude);
+      setUserLocation({ latitude: profile.latitude, longitude: profile.longitude });
+      setSortByDistance(true);
+    }
+  }, [profile, userLocation]);
 
   useEffect(() => {
     const getGarages = async () => {

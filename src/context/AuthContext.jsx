@@ -9,24 +9,50 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Fail-safe timeout to prevent permanent white screen
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('Session loading timed out after 10 seconds');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     const getSessionAndProfile = async () => {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Starting session check...');
+
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw sessionError;
+        }
+
+        console.log('Session retrieved:', session?.user ? 'User found' : 'No user');
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          console.log('Fetching profile for user:', session.user.id);
+
           // Run queries in parallel to speed up loading
           const [profileResult, garageResult] = await Promise.all([
             supabase.from('profiles').select('*').eq('id', session.user.id).single(),
             supabase.from('garages').select('id').eq('owner_id', session.user.id).maybeSingle()
           ]);
 
+          if (profileResult.error) {
+            console.error('Profile query error:', profileResult.error);
+          }
+
           let userProfile = profileResult.data;
           const garage = garageResult.data;
 
           // 3. If owner but flag is false, fix it
           if (garage && userProfile && !userProfile.is_garage_owner) {
+            console.log('Updating garage owner flag');
             await supabase
               .from('profiles')
               .update({ is_garage_owner: true })
@@ -45,15 +71,25 @@ export const AuthProvider = ({ children }) => {
             role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
             is_garage_owner: userProfile?.is_garage_owner ?? false
           });
+          console.log('Profile loaded successfully');
         } else {
           setProfile(null);
         }
       } catch (error) {
-        console.error('Error loading auth session:', error);
+        console.error('CRITICAL ERROR loading auth session:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details
+        });
         setUser(null);
         setProfile(null);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          clearTimeout(timeoutId);
+          setLoading(false);
+          console.log('Session loading complete');
+        }
       }
     };
 
@@ -162,11 +198,41 @@ export const AuthProvider = ({ children }) => {
     },
     user,
     profile, // Provide profile in the context
+    loading, // Provide loading state
   };
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f8f9fa'
+      }}>
+        <div style={{
+          width: '50px',
+          height: '50px',
+          border: '5px solid #e1e4e8',
+          borderTop: '5px solid #0056b3', /* Primary Blue */
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

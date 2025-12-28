@@ -23,7 +23,7 @@ const SearchPage = () => {
     const getGarages = async () => {
       setLoading(true);
       try {
-        const cacheKey = `garages_cache_${city}_${rating}_${location}`;
+        const cacheKey = `garages_cache_${city}_${rating}_${sortByDistance ? 'sorted' : 'default'}`;
         const cachedData = localStorage.getItem(cacheKey);
 
         // Optimistically render cached data if available

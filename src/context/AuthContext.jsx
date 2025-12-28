@@ -5,73 +5,105 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // New state for user profile
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    // Fail-safe timeout to prevent permanent white screen
-    const timeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn('Session loading timed out after 10 seconds');
-        setLoading(false);
-      }
-    }, 10000); // 10 second timeout
-
     const getSessionAndProfile = async () => {
       try {
-        setLoading(true);
-        console.log('Starting session check...');
+        console.log('[AuthContext] Starting session check...');
+        console.log('[AuthContext] Supabase URL configured:', process.env.REACT_APP_SUPABASE_URL ? 'YES' : 'NO');
 
-        // 1. Try to load from LocalStorage first for instant UI
+        // 1. Load cached data immediately for instant UI
         const cachedProfile = localStorage.getItem('motormate_profile');
-        if (cachedProfile) {
+        const cachedSessionTime = localStorage.getItem('motormate_session_time');
+
+        if (cachedProfile && cachedSessionTime) {
           try {
-            setProfile(JSON.parse(cachedProfile));
-            // Don't set loading false yet, wait for session check to confirm validity
-            // Actually, we can set loading false to show UI, but we need to verify session.
-            // Let's keep loading true but we have data ready to show if we wanted.
+            const parsed = JSON.parse(cachedProfile);
+            const sessionTime = parseInt(cachedSessionTime);
+            // Use cache if less than 30 minutes old
+            if (Date.now() - sessionTime < 1000 * 60 * 30) {
+              console.log('[AuthContext] Using cached profile (instant load)');
+              setProfile(parsed);
+              setUser({ id: parsed.id, email: parsed.email });
+              setLoading(false); // Show UI immediately
+            }
           } catch (e) {
-            console.error('Error parsing cached profile', e);
+            console.error('[AuthContext] Cache parse error:', e);
           }
         }
 
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // 2. Verify session with timeout protection
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Session timeout')), 8000)
+        );
 
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          throw sessionError;
+        let session, sessionError;
+        try {
+          const result = await Promise.race([sessionPromise, timeoutPromise]);
+          session = result.data?.session;
+          sessionError = result.error;
+          console.log('[AuthContext] Session check completed');
+        } catch (timeoutError) {
+          console.error('[AuthContext] Session check timed out!');
+          console.error('[AuthContext] This usually means Supabase env vars are not set correctly');
+
+          // Keep cached data if timeout
+          if (cachedProfile && cachedSessionTime) {
+            console.log('[AuthContext] Using cached session due to timeout');
+            return;
+          }
+          throw new Error('Cannot connect to authentication server. Please check your internet connection.');
         }
 
-        console.log('Session retrieved:', session?.user ? 'User found' : 'No user');
-        setUser(session?.user ?? null);
+        if (sessionError) {
+          console.error('[AuthContext] Session error:', sessionError.message);
+          localStorage.removeItem('motormate_profile');
+          localStorage.removeItem('motormate_session_time');
+          setUser(null);
+          setProfile(null);
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-        if (session?.user) {
-          console.log('Fetching profile for user:', session.user.id);
+        if (!session?.user) {
+          console.log('[AuthContext] No active session');
+          localStorage.removeItem('motormate_profile');
+          localStorage.removeItem('motormate_session_time');
+          setUser(null);
+          setProfile(null);
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-          // Run queries in parallel to speed up loading
+        console.log('[AuthContext] Active session found for:', session.user.email);
+        setUser(session.user);
+
+        // 3. Fetch profile with error handling
+        try {
           const [profileResult, garageResult] = await Promise.all([
             supabase.from('profiles').select('*').eq('id', session.user.id).single(),
             supabase.from('garages').select('id').eq('owner_id', session.user.id).maybeSingle()
           ]);
 
-          if (profileResult.error) {
-            console.error('Profile query error:', profileResult.error);
+          if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+            console.error('[AuthContext] Profile fetch error:', profileResult.error);
           }
 
           let userProfile = profileResult.data;
           const garage = garageResult.data;
 
-          // 3. If owner but flag is false, fix it
+          // Update garage owner flag if needed
           if (garage && userProfile && !userProfile.is_garage_owner) {
-            console.log('Updating garage owner flag');
+            console.log('[AuthContext] Updating garage owner flag');
             await supabase
               .from('profiles')
               .update({ is_garage_owner: true })
               .eq('id', session.user.id);
-
-            // Update local variable
             userProfile.is_garage_owner = true;
           }
 
@@ -80,77 +112,97 @@ export const AuthProvider = ({ children }) => {
             full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
             email: session.user.email,
             phone: userProfile?.phone || session.user.user_metadata?.phone || '',
-            // Derive role from the boolean flag
             role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
             is_garage_owner: userProfile?.is_garage_owner ?? false
           };
 
           setProfile(finalProfile);
-          // Cache the fresh profile
           localStorage.setItem('motormate_profile', JSON.stringify(finalProfile));
+          localStorage.setItem('motormate_session_time', Date.now().toString());
 
-          console.log('Profile loaded successfully');
-        } else {
-          setProfile(null);
-          localStorage.removeItem('motormate_profile');
+          console.log('[AuthContext] ✓ Profile loaded:', finalProfile.role);
+        } catch (profileError) {
+          console.error('[AuthContext] Error fetching profile:', profileError.message);
+
+          // Fallback to basic profile
+          const basicProfile = {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || '',
+            phone: session.user.user_metadata?.phone || '',
+            role: 'customer',
+            is_garage_owner: false
+          };
+          setProfile(basicProfile);
+          localStorage.setItem('motormate_profile', JSON.stringify(basicProfile));
+          localStorage.setItem('motormate_session_time', Date.now().toString());
         }
       } catch (error) {
-        console.error('CRITICAL ERROR loading auth session:', error);
-        setUser(null);
-        setProfile(null);
-        localStorage.removeItem('motormate_profile');
+        console.error('[AuthContext] CRITICAL ERROR:', error.message);
+
+        // Keep cached data on errors
+        const cachedProfile = localStorage.getItem('motormate_profile');
+        if (!cachedProfile) {
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
         if (isMounted) {
-          clearTimeout(timeoutId);
           setLoading(false);
-          console.log('Session loading complete');
+          console.log('[AuthContext] Session check complete');
         }
       }
     };
 
     getSessionAndProfile();
 
+    // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[AuthContext] Auth event:', event);
+
         try {
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            // Optimistic update from cache if available and matching user
-            // (Only if we haven't just fetched it)
-
-            const [profileResult, garageResult] = await Promise.all([
-              supabase.from('profiles').select('*').eq('id', session.user.id).single(),
-              supabase.from('garages').select('id').eq('owner_id', session.user.id).maybeSingle()
-            ]);
-
-            let userProfile = profileResult.data;
-            const garage = garageResult.data;
-
-            if (garage && userProfile && !userProfile.is_garage_owner) {
-              await supabase
-                .from('profiles')
-                .update({ is_garage_owner: true })
-                .eq('id', session.user.id);
-              userProfile.is_garage_owner = true;
-            }
-
-            const refreshedProfile = {
-              id: session.user.id,
-              full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
-              email: session.user.email,
-              phone: userProfile?.phone || session.user.user_metadata?.phone || '',
-              role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
-              is_garage_owner: userProfile?.is_garage_owner ?? false
-            };
-
-            setProfile(refreshedProfile);
-            localStorage.setItem('motormate_profile', JSON.stringify(refreshedProfile));
-          } else {
+          if (!session?.user) {
+            setUser(null);
             setProfile(null);
             localStorage.removeItem('motormate_profile');
+            localStorage.removeItem('motormate_session_time');
+            setLoading(false);
+            return;
           }
+
+          setUser(session.user);
+
+          const [profileResult, garageResult] = await Promise.all([
+            supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+            supabase.from('garages').select('id').eq('owner_id', session.user.id).maybeSingle()
+          ]);
+
+          let userProfile = profileResult.data;
+          const garage = garageResult.data;
+
+          if (garage && userProfile && !userProfile.is_garage_owner) {
+            await supabase
+              .from('profiles')
+              .update({ is_garage_owner: true })
+              .eq('id', session.user.id);
+            userProfile.is_garage_owner = true;
+          }
+
+          const refreshedProfile = {
+            id: session.user.id,
+            full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
+            email: session.user.email,
+            phone: userProfile?.phone || session.user.user_metadata?.phone || '',
+            role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
+            is_garage_owner: userProfile?.is_garage_owner ?? false
+          };
+
+          setProfile(refreshedProfile);
+          localStorage.setItem('motormate_profile', JSON.stringify(refreshedProfile));
+          localStorage.setItem('motormate_session_time', Date.now().toString());
         } catch (error) {
-          console.error('Error handling auth state change:', error);
+          console.error('[AuthContext] Auth state change error:', error);
         } finally {
           setLoading(false);
         }
@@ -158,6 +210,7 @@ export const AuthProvider = ({ children }) => {
     );
 
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -171,11 +224,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (authData.user) {
-        // Profile is created automatically by database trigger on auth.users
         const { full_name, phone, is_garage_owner } = data.options.data;
         const role = is_garage_owner ? 'garage_owner' : 'customer';
 
-        // Update the local profile state
         setProfile({
           id: authData.user.id,
           full_name: full_name,
@@ -189,10 +240,7 @@ export const AuthProvider = ({ children }) => {
     signIn: async (data) => {
       const { data: authData, error } = await supabase.auth.signInWithPassword(data);
 
-      // Only check email verification if user has never logged in before
-      // (email_confirmed_at exists but no previous sessions)
       if (authData?.user && !authData.user.email_confirmed_at) {
-        // Check if this is truly first login by checking last_sign_in_at
         const isFirstLogin = !authData.user.last_sign_in_at ||
           authData.user.last_sign_in_at === authData.user.created_at;
 
@@ -219,8 +267,8 @@ export const AuthProvider = ({ children }) => {
       return { error };
     },
     user,
-    profile, // Provide profile in the context
-    loading, // Provide loading state
+    profile,
+    loading,
   };
 
   return (

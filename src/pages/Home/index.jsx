@@ -31,7 +31,7 @@ const HomePage = () => {
         <div className="hero-content">
           <h1 className="hero-title">From Engine to Exterior — We've Got You <span>Covered.</span></h1>
           <p className="hero-subtitle">Book effortless car servicing with pickup & drop, real-time tracking and reliable professionals.</p>
-          <Link to="/choose-service" className="hero-cta">Book a Slot</Link>
+          <Link to="/search" className="hero-cta">Book a Slot</Link>
         </div>
       </section>
 

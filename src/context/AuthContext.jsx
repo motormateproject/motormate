@@ -8,13 +8,23 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Helper to fetch and format profile
+  // Helper to fetch and format profile with timeout
   const fetchProfile = async (userId, userEmail, userMetadata) => {
     try {
-      const [profileResult, garageResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
-        supabase.from('garages').select('id').eq('owner_id', userId).maybeSingle()
-      ]);
+      // enhanced fetch with 5s timeout to prevent hanging
+      const fetchPromise = (async () => {
+        const [profileResult, garageResult] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', userId).single(),
+          supabase.from('garages').select('id').eq('owner_id', userId).maybeSingle()
+        ]);
+        return { profileResult, garageResult };
+      })();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+
+      const { profileResult, garageResult } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (profileResult.error && profileResult.error.code !== 'PGRST116') {
         console.error('[AuthContext] Profile fetch error:', profileResult.error);
@@ -60,6 +70,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
 
+    // Failsafe: Force loading to false after 4 seconds max
+    const failsafeTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('[AuthContext] Failsafe triggered: forcing loading to false');
+        setLoading(false);
+      }
+    }, 4000);
+
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -101,6 +119,7 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       isMounted = false;
+      clearTimeout(failsafeTimeout);
       authListener.subscription.unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

@@ -24,6 +24,19 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         console.log('Starting session check...');
 
+        // 1. Try to load from LocalStorage first for instant UI
+        const cachedProfile = localStorage.getItem('motormate_profile');
+        if (cachedProfile) {
+          try {
+            setProfile(JSON.parse(cachedProfile));
+            // Don't set loading false yet, wait for session check to confirm validity
+            // Actually, we can set loading false to show UI, but we need to verify session.
+            // Let's keep loading true but we have data ready to show if we wanted.
+          } catch (e) {
+            console.error('Error parsing cached profile', e);
+          }
+        }
+
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
@@ -62,7 +75,7 @@ export const AuthProvider = ({ children }) => {
             userProfile.is_garage_owner = true;
           }
 
-          setProfile({
+          const finalProfile = {
             id: session.user.id,
             full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
             email: session.user.email,
@@ -70,20 +83,22 @@ export const AuthProvider = ({ children }) => {
             // Derive role from the boolean flag
             role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
             is_garage_owner: userProfile?.is_garage_owner ?? false
-          });
+          };
+
+          setProfile(finalProfile);
+          // Cache the fresh profile
+          localStorage.setItem('motormate_profile', JSON.stringify(finalProfile));
+
           console.log('Profile loaded successfully');
         } else {
           setProfile(null);
+          localStorage.removeItem('motormate_profile');
         }
       } catch (error) {
         console.error('CRITICAL ERROR loading auth session:', error);
-        console.error('Error details:', {
-          message: error.message,
-          code: error.code,
-          details: error.details
-        });
         setUser(null);
         setProfile(null);
+        localStorage.removeItem('motormate_profile');
       } finally {
         if (isMounted) {
           clearTimeout(timeoutId);
@@ -100,6 +115,9 @@ export const AuthProvider = ({ children }) => {
         try {
           setUser(session?.user ?? null);
           if (session?.user) {
+            // Optimistic update from cache if available and matching user
+            // (Only if we haven't just fetched it)
+
             const [profileResult, garageResult] = await Promise.all([
               supabase.from('profiles').select('*').eq('id', session.user.id).single(),
               supabase.from('garages').select('id').eq('owner_id', session.user.id).maybeSingle()
@@ -116,16 +134,20 @@ export const AuthProvider = ({ children }) => {
               userProfile.is_garage_owner = true;
             }
 
-            setProfile({
+            const refreshedProfile = {
               id: session.user.id,
               full_name: userProfile?.full_name || session.user.user_metadata?.full_name || '',
               email: session.user.email,
               phone: userProfile?.phone || session.user.user_metadata?.phone || '',
               role: (userProfile?.is_garage_owner || session.user.user_metadata?.is_garage_owner) ? 'garage_owner' : 'customer',
               is_garage_owner: userProfile?.is_garage_owner ?? false
-            });
+            };
+
+            setProfile(refreshedProfile);
+            localStorage.setItem('motormate_profile', JSON.stringify(refreshedProfile));
           } else {
             setProfile(null);
+            localStorage.removeItem('motormate_profile');
           }
         } catch (error) {
           console.error('Error handling auth state change:', error);

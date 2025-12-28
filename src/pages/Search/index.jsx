@@ -23,16 +23,47 @@ const SearchPage = () => {
     const getGarages = async () => {
       setLoading(true);
       try {
+        const cacheKey = `garages_cache_${city}_${rating}_${location}`;
+        const cachedData = localStorage.getItem(cacheKey);
+
+        // Optimistically render cached data if available
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
+            // Check if cache is fresh (< 20 mins)
+            if (Date.now() - parsed.timestamp < 1000 * 60 * 20) {
+              setGarages(parsed.data);
+              if (sortByDistance && userLocation) {
+                // We already have data, just resort it
+                const sortedWithLoc = sortGaragesByDistance(parsed.data, userLocation);
+                setGarages(sortedWithLoc);
+              }
+              setLoading(false);
+              // Optionally fetch in background to update cache?
+              // For now, let's just rely on cache to solve the "loading forever" issue
+              console.log('Using cached garages');
+              return;
+            }
+          } catch (e) { console.error('Cache parse error', e); }
+        }
+
         // Pass filters directly to fetchGarages
         const fetchedGarages = await fetchGarages(city, rating);
 
         // Sort by distance if user location is available and sorting is enabled
+        let finalGarages = fetchedGarages;
         if (sortByDistance && userLocation) {
-          const sortedGarages = sortGaragesByDistance(fetchedGarages, userLocation);
-          setGarages(sortedGarages);
-        } else {
-          setGarages(fetchedGarages);
+          finalGarages = sortGaragesByDistance(fetchedGarages, userLocation);
         }
+
+        setGarages(finalGarages);
+
+        // Cache the result
+        localStorage.setItem(cacheKey, JSON.stringify({
+          timestamp: Date.now(),
+          data: fetchedGarages // cache raw data before sorting by distance (which changes)
+        }));
+
       } catch (error) {
         console.error('Error fetching garages:', error);
       } finally {
